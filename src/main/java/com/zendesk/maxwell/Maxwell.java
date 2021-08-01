@@ -12,7 +12,11 @@ import com.zendesk.maxwell.replication.Replicator;
 import com.zendesk.maxwell.row.HeartbeatRowMap;
 import com.zendesk.maxwell.schema.*;
 import com.zendesk.maxwell.schema.columndef.ColumnDefCastException;
+import com.zendesk.maxwell.util.CuratorUtils;
 import com.zendesk.maxwell.util.Logging;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.recipes.leader.LeaderLatch;
+import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,7 +285,48 @@ public class Maxwell implements Runnable {
 			LOGGER.info("Starting Maxwell. maxMemory: " + Runtime.getRuntime().maxMemory() + " bufferMemoryUsage: " + config.bufferMemoryUsage);
 
 			if ( config.haMode ) {
-				new MaxwellHA(maxwell, config.jgroupsConf, config.raftMemberID, config.clientID).startHA();
+				//new MaxwellHA(maxwell, config.jgroupsConf, config.raftMemberID, config.clientID).startHA();
+				CuratorUtils cu = new CuratorUtils();
+				cu.setZookeeperServer(config.zookeeperServer);
+				cu.setSessionTimeoutMs(config.sessionTimeoutMs);
+				cu.setConnectionTimeoutMs(config.connectionTimeoutMs);
+				cu.setMaxRetries(config.maxRetries);
+				cu.setBaseSleepTimeMs(config.baseSleepTimeMs);
+				cu.init();
+				CuratorFramework client = cu.getClient();
+				LeaderLatch leader = new LeaderLatch(client, cu.getElectPath());
+				leader.addListener(new LeaderLatchListener() {
+					@Override
+					public void isLeader() {
+						try {
+							cu.register();
+							maxwell.start();
+						} catch (SQLException e) {
+							// catch SQLException explicitly because we likely don't care about the stacktrace
+							LOGGER.error("SQLException: " + e.getLocalizedMessage());
+							System.exit(1);
+						} catch (URISyntaxException e) {
+							// catch URISyntaxException explicitly as well to provide more information to the user
+							LOGGER.error("Syntax issue with URI, check for misconfigured host, port, database, or JDBC options (see RFC 2396)");
+							LOGGER.error("URISyntaxException: " + e.getLocalizedMessage());
+							System.exit(1);
+						} catch (ServerException e) {
+							LOGGER.error("Maxwell couldn't find the requested binlog, exiting...");
+							System.exit(2);
+						} catch (Exception e) {
+							System.exit(1);
+						}
+
+					}
+
+					@Override
+					public void notLeader() {
+
+					}
+				});
+
+				leader.start();
+				Thread.sleep(Integer.MAX_VALUE);
 			} else {
 				maxwell.start();
 			}

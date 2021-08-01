@@ -148,9 +148,17 @@ public class MaxwellConfig extends AbstractConfig {
 	public String javascriptFile;
 	public Scripting scripting;
 
-	public boolean haMode;
+//	public boolean haMode;
 	public String jgroupsConf;
 	public String raftMemberID;
+	/**zookeeper maxwell configurations start */
+	public Boolean haMode;  // hamode is ha setting
+	public String zookeeperServer; // zk server
+	public int sessionTimeoutMs;  //  zkServer session time out setting
+	public int connectionTimeoutMs;  // connection time out setting
+	public int maxRetries;  // max retry times
+	public int baseSleepTimeMs;  // sleep time setting
+	/**zookeeper maxwell configurations end */
 
 	public MaxwellConfig() { // argv is only null in tests
 		this.customProducerProperties = new Properties();
@@ -161,6 +169,9 @@ public class MaxwellConfig extends AbstractConfig {
 		this.schemaMysql = new MaxwellMysqlConfig();
 		this.masterRecovery = false;
 		this.gtidMode = false;
+		/**zookeeper maxwell configurations start*/
+		this.haMode = false;
+		/**zookeeper maxwell configurations end*/
 		this.bufferedProducerSize = 200;
 		this.outputConfig = new MaxwellOutputConfig();
 		setup(null, null); // setup defaults
@@ -244,6 +255,16 @@ public class MaxwellConfig extends AbstractConfig {
 
 		parser.accepts( "daemon", "run maxwell in the background" )
 				.withOptionalArg().ofType(Boolean.class);
+
+		/**zookeeper maxwell configurations start*/
+		parser.accepts( "ha_mode", "run Maxwell in high availability mode" ).withOptionalArg();
+		parser.accepts( "zookeeper_server", "run Maxwell in high availability mode" ).withOptionalArg();
+		parser.accepts( "session_time_out_ms", "session timeout" ).withOptionalArg();
+		parser.accepts( "connection_time_out_ms", "connection timeout" ).withOptionalArg();
+		parser.accepts( "max_retries", "maximum number of retries" ).withOptionalArg();
+		parser.accepts( "base_sleep_time_ms", "The initial sleep time used to calculate the sleep time for each subsequent retry" ).withOptionalArg();
+		/**zookeeper maxwell configurations end*/
+
 		parser.accepts( "log_level", "DEBUG|INFO|WARN|ERROR" )
 				.withRequiredArg();
 		parser.accepts( "env_config_prefix", "prefix of maxwell configuration environment variables, case insensitive" )
@@ -509,6 +530,21 @@ public class MaxwellConfig extends AbstractConfig {
 		this.schemaMysql        = parseMysqlConfig("schema_", options, properties);
 		this.gtidMode           = fetchBooleanOption("gtid_mode", options, properties, System.getenv(GTID_MODE_ENV) != null);
 
+		/**zookeeper maxwell configurations start*/
+		this.haMode                      = fetchBooleanOption("ha_mode", options, properties, false);
+		this.zookeeperServer             = (String) fetchOption("zookeeper_server", options, properties, null);
+		this.sessionTimeoutMs            = Integer.parseInt((String) fetchOption("session_time_out_ms", options, properties, "6000"));
+		this.connectionTimeoutMs         = Integer.parseInt((String) fetchOption("connection_time_out_ms", options, properties, "6000"));
+		this.maxRetries                  = Integer.parseInt((String) fetchOption("max_retries", options, properties, "3"));
+		this.baseSleepTimeMs             = Integer.parseInt((String) fetchOption("base_sleep_time_ms", options, properties, "1000"));
+
+		if(haMode){
+			if(null == zookeeperServer){
+				usageForOptions("null is not allowed in high availability mode: " + zookeeperServer, "--zookeeper_server");
+			}
+		}
+		/**zookeeper maxwell configurations end*/
+
 		this.databaseName       = fetchStringOption("schema_database", options, properties, "maxwell");
 		this.maxwellMysql.database = this.databaseName;
 
@@ -664,8 +700,8 @@ public class MaxwellConfig extends AbstractConfig {
 		this.excludeColumns     = fetchStringOption("exclude_columns", options, properties, null);
 
 		setupEncryptionOptions(options, properties);
-
-		this.haMode = fetchBooleanOption("ha", options, properties, false);
+		// use zookeeper ha ,you need to prohibit raft setting
+//		this.haMode = fetchBooleanOption("ha", options, properties, false);
 		this.jgroupsConf = fetchStringOption("jgroups_config", options, properties, "raft.xml");
 		this.raftMemberID = fetchStringOption("raft_member_id", options, properties, null);
 	}
