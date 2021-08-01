@@ -20,7 +20,7 @@ public class MaxwellLeaders {
 			cu.setMaxRetries(config.maxRetries);
 			cu.setBaseSleepTimeMs(config.baseSleepTimeMs);
 			cu.init();
-			List<String> instances = cu.getInstances();
+			List<String> instances = cu.getInstances();   // cu.register() ,set leader path
 			if(0 == instances.size()){
 				LOGGER.info("Maxwell is not a high availability mode Or maxwell is not started");
 			}else {

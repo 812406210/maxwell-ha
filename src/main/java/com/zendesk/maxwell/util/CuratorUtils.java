@@ -97,6 +97,8 @@ public class CuratorUtils {
 		}
 		return childrenList;
 	}
+
+	// get leader path
 	public List<String> getInstances() {
 		return getChildren(masterPath);
 	}

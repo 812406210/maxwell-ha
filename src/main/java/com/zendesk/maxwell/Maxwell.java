@@ -299,7 +299,7 @@ public class Maxwell implements Runnable {
 					@Override
 					public void isLeader() {
 						try {
-							cu.register();
+							cu.register(); // this step to set leader host  to zkServer leader path
 							maxwell.start();
 						} catch (SQLException e) {
 							// catch SQLException explicitly because we likely don't care about the stacktrace
